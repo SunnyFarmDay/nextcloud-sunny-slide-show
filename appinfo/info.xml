@@ -1,0 +1,53 @@
+<?xml version="1.0"?>
+<info>
+	<id>sunny-slide-show</id>
+	<name>Sunny Slide Show</name>
+	<summary>Sunny Slide Show</summary>
+	<description>
+	<![CDATA[UI & Translations skeleton of the Nextcloud application written in Python]]>
+	</description>
+	<version>1.0.0</version>
+	<licence>MIT</licence>
+	<author mail="yypoonaa@connect.ust.hk" homepage="https://github.com/sunnyfarmday">Sunny POON</author>
+	<namespace>SunnySlideShow</namespace>
+	<category>tools</category>
+	<website>https://github.com/SunnyFarmDay/nextcloud-sunny-slide-show</website>
+	<bugs>https://github.com/SunnyFarmDay/nextcloud-sunny-slide-show/issues</bugs>
+	<repository type="git">https://github.com/SunnyFarmDay/nextcloud-sunny-slide-show</repository>
+	<dependencies>
+		<nextcloud min-version="28" max-version="31"/>
+	</dependencies>
+	<external-app>
+		<docker-install>
+			<registry>ghcr.io</registry>
+			<image>SunnyFarmDay/nextcloud-sunny-slide-show</image>
+			<image-tag>latest</image-tag>
+		</docker-install>
+		<routes>
+			<route>
+				<url>img\/.*</url>
+				<verb>GET</verb>
+				<access_level>USER</access_level>
+				<headers_to_exclude>[]</headers_to_exclude>
+			</route>
+			<route>
+				<url>js\/.*</url>
+				<verb>GET</verb>
+				<access_level>USER</access_level>
+				<headers_to_exclude>[]</headers_to_exclude>
+			</route>
+			<route>
+				<url>css\/.*</url>
+				<verb>GET</verb>
+				<access_level>USER</access_level>
+				<headers_to_exclude>[]</headers_to_exclude>
+			</route>
+			<route>
+				<url>api\/.*</url>
+				<verb>GET,POST,PUT,DELETE</verb>
+				<access_level>USER</access_level>
+				<headers_to_exclude>[]</headers_to_exclude>
+			</route>
+		</routes>
+	</external-app>
+</info>
