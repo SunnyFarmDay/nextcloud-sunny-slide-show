@@ -1,5 +1,5 @@
 <template>
-	<NcContent app-name="ui_example">
+	<NcContent app-name="sunny-slide-show">
 		<Navigation />
 		<NcAppContent>
 			<div class="ui-example">
