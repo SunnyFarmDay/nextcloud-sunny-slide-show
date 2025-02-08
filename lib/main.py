@@ -207,18 +207,7 @@ SETTINGS_EXAMPLE = SettingsForm(
 def enabled_handler(enabled: bool, nc: NextcloudApp) -> str:
     print(f"enabled={enabled}")
     if enabled:
-        nc.ui.resources.set_initial_state(
-            "top_menu",
-            "first_menu",
-            "ui_example_state",
-            {"initial_value": "test init value"},
-        )
-        nc.ui.resources.set_script("top_menu", "first_menu", "js/sunny-slide-show-main")
-        nc.ui.top_menu.register("first_menu", "Sunny Slide Show", "img/app.svg")
-        # nc.ui.files_dropdown_menu.register("test_menu", _("Test menu"), "api/test_menu", mime="image, video",
-        #                                    icon="img/app-dark.svg")
-        # nc.ui.files_dropdown_menu.register_ex("test_redirect", _("Test redirect"), "api/test_redirect", mime="image/jpeg",
-        #                                       icon="img/app-dark.svg")
+
         nc.ui.files_dropdown_menu.register_ex("redirect_slideshow", _("To Slide Show"), "api/redirect_slide_show", mime="image, video",
                                         icon="img/app-dark.svg")
         nc.occ_commands.register("ui_example:ping", "/occ_ping")
@@ -256,13 +245,6 @@ def enabled_handler(enabled: bool, nc: NextcloudApp) -> str:
         if nc.srv_version["major"] >= 29:
             nc.ui.settings.register_form(SETTINGS_EXAMPLE)
     else:
-        nc.ui.resources.delete_initial_state(
-            "top_menu", "first_menu", "ui_example_state"
-        )
-        nc.ui.resources.delete_script("top_menu", "first_menu", "js/ui_example-main")
-        nc.ui.top_menu.unregister("first_menu")
-        # nc.ui.files_dropdown_menu.unregister("test_menu")
-        # nc.ui.files_dropdown_menu.unregister("test_redirect")
         nc.ui.files_dropdown_menu.unregister("redirect_slideshow")
         nc.occ_commands.unregister("ui_example:ping")
         nc.occ_commands.unregister("ui_example:setup")
@@ -272,43 +254,6 @@ def enabled_handler(enabled: bool, nc: NextcloudApp) -> str:
 
 class Button1Format(BaseModel):
     initial_value: str
-
-
-@APP.post("/api/verify_initial_value")
-async def verify_initial_value(
-    input1: Button1Format,
-):
-    print("Old value: ", input1.initial_value)
-    return responses.JSONResponse(
-        content={"initial_value": str(random.randint(0, 100))}, status_code=200
-    )
-
-
-# @APP.post("/api/test_menu")
-# async def test_menu_handler(
-#     file: UiActionFileInfo,
-#     nc: Annotated[NextcloudApp, Depends(nc_app)],
-#     accept_language: Annotated[str | None, Header()] = None
-# ):
-#     print(f'File: {file}')
-#     print(f'Accept-Language: {accept_language}')
-#     print(_("Test menu"))
-#     # Note: Only singular string translations are supported
-#     nc.notifications.create(_('Test notification subject'), _("Test notification message"))
-#     return responses.Response()
-
-
-# @APP.post("/api/test_redirect")
-# async def test_menu_handler(
-#     files: NodesPayload,
-#     nc: Annotated[NextcloudApp, Depends(nc_app)],
-#     accept_language: Annotated[str | None, Header()] = None
-# ):
-#     print(f'Files: {files}')
-#     print(f'Accept-Language: {accept_language}')
-#     print(_("Test redirect"))
-#     nc.notifications.create(_('Test redirect notification subject'), _("Test redirect notification message"))
-#     return responses.JSONResponse(content={"redirect_handler": "first_menu/second_page"})
 
 nc_instance: NextcloudApp
 
@@ -369,29 +314,6 @@ async def occ_stream(data: OccData):
     print(f"params: {data}")
     return StreamingResponse(fake_data_streamer(data), status_code=200, media_type="text/plain")
 
-
-@APP.post("/api/nextcloud_file")
-async def nextcloud_file(
-    args: dict,
-):
-    print(args["file_info"])
-    return responses.Response()
-
-@APP.post("/api/get_image")
-async def get_image(
-    args: dict,
-):
-    # query image with 
-    nc = ncInstance.getNc(args['user_id'])
-    file = nc.files.by_id(args["file_info"]['fileid'])
-    print(file)
-    contentType = args["file_info"]['getcontenttype']
-    content = nc.files.download(file)
-    file_stream = BytesIO(content)
-    response = responses.StreamingResponse(content=file_stream, media_type=contentType, headers={"Content-Disposition": f"attachment; filename={file.name}"})
-    print(response)
-    
-    return response
 
 if __name__ == "__main__":
     run_app("main:APP", log_level="trace")

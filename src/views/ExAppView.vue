@@ -23,7 +23,6 @@ import NcInputField from '@nextcloud/vue/dist/Components/NcInputField.js'
 import NcButton from '@nextcloud/vue/dist/Components/NcButton.js'
 import NcContent from '@nextcloud/vue/dist/Components/NcContent.js'
 import NcAppContent from '@nextcloud/vue/dist/Components/NcAppContent.js'
-import Navigation from '../components/Navigation.vue'
 
 export default {
 	name: 'ExAppView',
@@ -32,7 +31,6 @@ export default {
 		NcAppContent,
 		NcInputField,
 		NcButton,
-		Navigation,
 	},
 	data() {
 		return {

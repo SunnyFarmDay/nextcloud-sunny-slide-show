@@ -68,6 +68,7 @@ const actions = {
 		const davClient = getClient()
 		// remove the first two leading components of the path
 		const path = filename.split('/').slice(3).join('/')
+		// get file contents by fileId
 		const response = await davClient.getFileContents(`${path}`, { details: true })
 		return URL.createObjectURL(new Blob([response.data], { type: response.headers['content-type'] }))
 	},

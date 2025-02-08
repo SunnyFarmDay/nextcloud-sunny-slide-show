@@ -1,82 +1,85 @@
 <template>
 	<NcContent app-name="sunny-slide-show">
-		<template v-if="loading">
-			<div class="loader">
-				<div class="loader__spinner"></div>
+	  <template v-if="loading">
+		<div class="loader">
+		  <div class="loader__spinner" />
+		</div>
+	  </template>
+	  <NcAppContent>
+		<div class="test-files-pickers">
+		  <div class="slider-container">
+			<h2>{{ t('ui_example', 'Slide Show') }}</h2>
+			<div class="autoplay-control">
+			  <div class="slider-container">
+				<label for="autoplay-slider">Autoplay Speed: {{ autoPlayInterval }} ms</label>
+				<input id="autoplay-slider"
+				  v-model="autoPlayInterval"
+				  type="range"
+				  min="1000"
+				  max="10000"
+				  step="100">
+			  </div>
 			</div>
-		</template>
-		<NcAppContent>
-			<div class="test-files-pickers">
-				<div class="slider-container">
-					<h2>{{ t('ui_example', 'Slide Show') }}</h2>
-					<NcButton @click="selectTestFile">
-						{{ t('ui_example', 'Select test file') }}
-					</NcButton>
-					<NcButton @click="getImageFromDav">
-						{{ t('ui_example', 'Get image from DAV') }}
-					</NcButton>
-					<div class="autoplay-control">
-						<div class="slider-container">
-							<label for="autoplay-slider">Autoplay Speed: {{ autoPlayInterval }} ms</label>
-							<input id="autoplay-slider" type="range" min="1000" max="10000" step="100"
-								v-model="autoPlayInterval" />
-						</div>
-						<p>Current Autoplay Interval: {{ autoPlayInterval }} ms</p>
-					</div>
-				</div>
-
-				<div ref="fullscreenDiv" :class="isFullscreen ? 'media-container-fullscreen' : 'media-container'">
-					<div v-if="loadingMedia" class="loader_local">
-						<div class="loader__spinner"></div>
-					</div>
-					<div v-else>
-						<RenderImage v-if="isImage" :selectedUrl="selectedUrl" />
-						<video v-else-if="isVideo" :src="selectedUrl" controls autoplay @ended="handleVideoEnd" />
-					</div>
-					<div class="scroll-buttons">
-						<button @click="handlePrevious" class="left-button">
-							<i class="ri-arrow-left-double-line"></i>
-						</button>
-						<button @click="handleNext" class="right-button">
-							<i class="ri-arrow-right-double-line"></i>
-						</button>
-					</div>
-					<NcButton class="toggle-fullscreen" @click="toggleFullscreen">
-						{{ isFullscreen ? 'Exit Fullscreen' : 'Fullscreen' }}
-					</NcButton>
-					<NcButton class="toggle-auto-play" @click="toggleAutoPlay">
-						{{ autoPlay ? 'Stop' : 'Play' }}
-					</NcButton>
-				</div>
-				<p>{{ testResponse }}</p>
-
-				<template v-if="selectedFileIds.length > 0">
-					<h3>{{ t('ui_example', 'Selected from File Actions Menu:') }}</h3>
-					<p><b>{{ t('ui_example', 'File List:') }}</b> {{ fileList }}</p>
-				</template>
+		  </div>
+  
+		  <div ref="fullscreenDiv" :class="isFullscreen ? 'media-container-fullscreen' : 'media-container'">
+			<template v-if="loadingMedia">
+			  <div class="loader_local">
+				<div class="loader__spinner" />
+				<p>{{ loadingMediaText }}</p>
+			  </div>
+			</template>
+			<template v-else>
+			  <transition name="fade" mode="out-in">
+				<RenderMedia
+				  :key="selectedUrl"
+				  :animation-enabled="true"
+				  :animation="animationStyles"
+				  :media-type="selectedFileInfo.mime ?? 'empty'"
+				  :selected-url="selectedUrl"
+				  @video-ended="handleVideoEnd" />
+			  </transition>
+			</template>
+			<div class="scroll-buttons">
+			  <button class="left-button" @click="handlePrevious">
+				<i class="ri-arrow-left-double-line" />
+			  </button>
+			  <button class="right-button" @click="handleNext">
+				<i class="ri-arrow-right-double-line" />
+			  </button>
 			</div>
-		</NcAppContent>
+			<NcButton class="toggle-fullscreen" @click="toggleFullscreen">
+			  <i :class="isFullscreen ? 'ri-fullscreen-fill' : 'ri-fullscreen-fill'" />
+			</NcButton>
+			<NcButton class="toggle-auto-play" @click="toggleAutoPlay">
+			  <i :class="autoPlay ? 'ri-stop-fill' : 'ri-play-fill'" />
+			</NcButton>
+		  </div>
+		  <p>{{ testResponse }}</p>
+  
+		  <template v-if="selectedFileIds.length > 0">
+			<h3>{{ t('ui_example', 'Selected from File Actions Menu:') }}</h3>
+			<p><b>{{ t('ui_example', 'File List:') }}</b> {{ fileList }}</p>
+		  </template>
+		</div>
+	  </NcAppContent>
 	</NcContent>
-</template>
+  </template>
 
 <script>
 import NcButton from '@nextcloud/vue/dist/Components/NcButton.js'
-import { RiArrowLeftSLine, RiArrowRightSLine } from 'react-icons/ri'
 import { getFilePickerBuilder } from '@nextcloud/dialogs'
-import { formatBytes, requestFileInfo, searchByFileId } from '../files.js'
+import { formatBytes, searchByFileId } from '../files.js'
 
 import '@nextcloud/dialogs/style.css'
-import Navigation from '../components/Navigation.vue'
 import NcContent from '@nextcloud/vue/dist/Components/NcContent.js'
 import NcAppContent from '@nextcloud/vue/dist/Components/NcAppContent.js'
-import { NcAppNavigation } from '@nextcloud/vue'
-import RenderImage from '../components/RenderImage.vue'
+import RenderMedia from '../components/RenderMedia.vue'
 
 export default {
 	name: 'SlideShow',
 	components: {
-		Navigation,
-		RenderImage,
+		RenderMedia,
 		NcContent,
 		NcButton,
 		NcAppContent,
@@ -100,19 +103,17 @@ export default {
 			autoPlayInterval: 3000,
 			autoPlayTimeout: null,
 			loadingMedia: false,
+			loadingMediaText: '',
+			animationStyles: {
+				'--start-x': '0',
+				'--start-y': '0',
+				'--end-x': '0',
+				'--end-y': '0',
+				'--start-scale': 1,
+				'--end-scale': 1,
+				'--animation-duration': '0',
+			},
 		}
-	},
-	mounted() {
-		document.addEventListener('fullscreenchange', this.handleFullscreenChange);
-		document.addEventListener('webkitfullscreenchange', this.handleFullscreenChange); // Safari
-		document.addEventListener('mozfullscreenchange', this.handleFullscreenChange); // Firefox
-		document.addEventListener('MSFullscreenChange', this.handleFullscreenChange); // IE/Edge
-	},
-	beforeDestroy() {
-		document.removeEventListener('fullscreenchange', this.handleFullscreenChange);
-		document.removeEventListener('webkitfullscreenchange', this.handleFullscreenChange);
-		document.removeEventListener('mozfullscreenchange', this.handleFullscreenChange);
-		document.removeEventListener('MSFullscreenChange', this.handleFullscreenChange);
 	},
 	computed: {
 		formattedSize() {
@@ -125,35 +126,65 @@ export default {
 			return this.selectedFileInfo?.mime?.startsWith('video')
 		},
 	},
+	mounted() {
+		document.addEventListener('fullscreenchange', this.handleFullscreenChange)
+		document.addEventListener('webkitfullscreenchange', this.handleFullscreenChange) // Safari
+		document.addEventListener('mozfullscreenchange', this.handleFullscreenChange) // Firefox
+		document.addEventListener('MSFullscreenChange', this.handleFullscreenChange) // IE/Edge
+		this.loading = false
+		this.setViewMediaIndex(0)
+	},
+	beforeDestroy() {
+		document.removeEventListener('fullscreenchange', this.handleFullscreenChange)
+		document.removeEventListener('webkitfullscreenchange', this.handleFullscreenChange)
+		document.removeEventListener('mozfullscreenchange', this.handleFullscreenChange)
+		document.removeEventListener('MSFullscreenChange', this.handleFullscreenChange)
+	},
 	beforeMount() {
 		// Load files info from fileIds query parameter if exists
 		if (this.$route.query.fileIds) {
 			this.selectedFileIds = this.$route.query.fileIds.split(',').map(Number)
-			this.selectedFilesInfo = new Array(this.selectedFileIds.length) // Initialize the array
-
-			const filePromises = this.selectedFileIds.map(fileId => {
-				return searchByFileId(fileId).then(fileInfo => {
-					const fileId = fileInfo.props.fileid
-					// find the index of the file in the list
-					const index = this.selectedFileIds.indexOf(fileId)
-					this.selectedFilesInfo[index] = fileInfo
-				})
-			})
-
-			Promise.all(filePromises).then(() => {
-				this.fileList = this.selectedFilesInfo.map(fileInfo => fileInfo.filename).join('\n')
-				this.setViewMediaIndex(0)
-				this.loading = false
-			})
+			this.selectedFilesInfo = this.selectedFileIds
 		}
 	},
 	methods: {
+		async getFileInfoIntoList(fileId) {
+			const index = this.selectedFileIds.indexOf(fileId)
+			if (index === -1) {
+				console.error('File ID not found in list:', fileId)
+				return
+			}
+			const fileInfo = await searchByFileId(fileId)
+			this.selectedFilesInfo[index] = fileInfo
+			return fileInfo
+		},
+		randomizeAnimationStyles() {
+			this.animationStyles = {
+				'--start-x': `${Math.random() * 300}px`,
+				'--start-y': `${Math.random() * 300}px`,
+				'--end-x': `${Math.random() * 300}px`,
+				'--end-y': `${Math.random() * 300}px`,
+				'--start-scale': Math.random() * 0.25 + 1,
+				'--end-scale': Math.random() * 0.25 + 1,
+				'--animation-duration': this.autoPlayInterval / 1000 + 's',
+			}
+			console.log('Randomized animation styles:', this.animationStyles)
+		},
 		toggleAutoPlay() {
 			this.autoPlay = !this.autoPlay
 			if (this.autoPlay) {
 				this.setViewMediaIndex(this.currentMediaIndex)
 			} else {
 				clearTimeout(this.autoPlayTimeout)
+				this.animationStyles = {
+					'--start-x': '0',
+					'--start-y': '0',
+					'--end-x': '0',
+					'--end-y': '0',
+					'--start-scale': 1,
+					'--end-scale': 1,
+					'--animation-duration': '0',
+				}
 			}
 		},
 		handleVideoEnd() {
@@ -163,7 +194,7 @@ export default {
 			}
 		},
 		handleFullscreenChange() {
-			this.isFullscreen = !!document.fullscreenElement;
+			this.isFullscreen = !!document.fullscreenElement
 		},
 		toggleFullscreen() {
 			const div = this.$refs.fullscreenDiv
@@ -194,16 +225,21 @@ export default {
 		preloadMedia(index) {
 			if (!this.loadedMedia[index]) {
 				this.loadedMedia[index] = true
-				this.$store.dispatch('loadImageFromDav', this.selectedFilesInfo[index].filename).then(url => {
-					this.loadedMedia[index] = url
-				}).catch(error => {
-					console.error('Error fetching media:', error)
+
+				this.getFileInfoIntoList(this.selectedFileIds[index]).then(() => {
+					this.$store.dispatch('loadImageFromDav', this.selectedFilesInfo[index].filename).then(url => {
+						this.loadedMedia[index] = url
+						this.setUpAutoPlay()
+
+					}).catch(error => {
+						console.error('Error fetching media:', error)
+					})
 				})
 			}
 		},
 		setUpAutoPlay() {
 			if (this.autoPlay) {
-				var isVideo = this.selectedFilesInfo[this.currentMediaIndex].mime.startsWith('video')
+				const isVideo = this.selectedFilesInfo[this.currentMediaIndex].mime.startsWith('video')
 				if (this.autoPlayTimeout || isVideo) {
 					clearTimeout(this.autoPlayTimeout)
 				}
@@ -217,22 +253,35 @@ export default {
 		},
 		setViewMediaIndex(index) {
 			this.currentMediaIndex = index
-			this.selectedFile = this.selectedFilesInfo[index].filename
-			this.selectedFileInfo = this.selectedFilesInfo[index]
+			this.selectedFile = this.selectedFileIds[index]
 
 			// load the current media
 			if (!this.loadedMedia[index]) {
-				this.$store.dispatch('loadImageFromDav', this.selectedFilesInfo[index].filename).then(url => {
-					this.loadedMedia[index] = url
-					this.selectedUrl = url
-					this.setUpAutoPlay()
-
-				}).catch(error => {
-					console.error('Error fetching media:', error)
+				this.loadingMedia = true
+				this.selectedFileInfo = null
+				this.selectedUrl = ''
+				this.getFileInfoIntoList(this.selectedFile).then(() => {
+					this.$store.dispatch('loadImageFromDav', this.selectedFilesInfo[index].filename).then(url => {
+						this.loadingMedia = false
+						this.loadedMedia[index] = url
+						this.selectedUrl = url
+						this.selectedFileInfo = this.selectedFilesInfo[index]
+						console.log('Media loaded:', this.selectedUrl)
+						this.setUpAutoPlay()
+					}).catch(error => {
+						console.error('Error fetching media:', error)
+					})
 				})
 			} else {
 				if (this.loadedMedia[index] === true) {
 					this.loadingMedia = true
+					this.selectedFileInfo = null
+					this.selectedUrl = ''
+					if (this.selectedFilesInfo[index] instanceof Object) {
+						this.loadingMediaText = `Loading ${this.selectedFilesInfo[index].filename}...`
+					} else {
+						this.loadingMediaText = 'Loading media...'
+					}
 					console.log('Media not loaded yet, retrying in 100ms')
 					if (this.lastPollLoading) {
 						clearTimeout(this.lastPollLoading)
@@ -242,7 +291,11 @@ export default {
 					}, 100)
 				} else {
 					this.loadingMedia = false
+					this.loadingMediaText = ''
 					this.selectedUrl = this.loadedMedia[index]
+					this.selectedFileInfo = this.selectedFilesInfo[index]
+					console.log('Media loaded:', this.selectedUrl)
+					this.randomizeAnimationStyles()
 					this.setUpAutoPlay()
 				}
 			}
@@ -253,6 +306,7 @@ export default {
 					this.preloadMedia(i)
 				}
 			}
+
 		},
 		handlePrevious() {
 			this.setViewMediaIndex(Math.max(0, this.currentMediaIndex - 1))
@@ -266,25 +320,6 @@ export default {
 				.setType(1)
 				.allowDirectories(true)
 				.build()
-		},
-		getImageFromDav() {
-			console.log(this.selectedFile, this.selectedFileInfo)
-			this.$store.dispatch('getImageFromDav', this.selectedFile).then(response => {
-				console.log('Image fetched:', response)
-				const blob = new Blob([response], { type: this.selectedFileInfo.getcontenttype })
-				this.selectedUrl = URL.createObjectURL(blob)
-			}).catch(error => {
-				console.error('Error fetching image:', error)
-			})
-		},
-		selectTestFile() {
-			this.getFilesPicker(t('ui_example', 'Select test file')).pick().then(filePath => {
-				this.selectedFile = filePath
-				requestFileInfo(filePath).then(fileInfo => {
-					this.selectedFileInfo = fileInfo
-					this.getImageFromDav()
-				})
-			})
 		},
 		sendToExApp() {
 			this.$store.dispatch('sendNextcloudFileToExApp', this.selectedFileInfo)
@@ -333,18 +368,10 @@ export default {
 	/* Change to relative for normal layout */
 	width: 100%;
 	height: 80vh;
-	/* Set a maximum width */
-	margin: 20px auto;
-	/* Center the container with margin */
 	display: flex;
 	justify-content: center;
 	align-items: center;
 	background-color: black;
-	/* Optional background */
-	padding: 10px;
-	/* Add some padding */
-	border-radius: 8px;
-	/* Optional: rounded corners */
 	z-index: 10000;
 }
 
@@ -375,7 +402,7 @@ video {
 	max-width: 100%;
 	/* Fit within the container */
 	max-height: 100%;
-	object-fit: cover;
+	object-fit: contain;
 	/* Maintain aspect ratio */
 }
 
@@ -416,10 +443,10 @@ video {
 	/* Dark background */
 	color: #ffffff;
 	/* Light text color */
-	padding: 20px;
+	padding: 20px 20px;
 	border-radius: 10px;
 	/* Rounded corners */
-	max-width: 400px;
+	max-width: 800px;
 	/* Max width for the container */
 	margin: auto;
 	/* Center the container */
@@ -433,7 +460,7 @@ h2 {
 }
 
 .slider-container {
-	margin: 20px 0;
+	flex-direction: row;
 }
 
 label {
@@ -501,6 +528,7 @@ input[type="range"]::-moz-range-thumb {
 	justify-content: center;
 	align-items: center;
 	z-index: 10010;
+	flex-direction: column;
 }
 
 .loader_local {
@@ -510,6 +538,7 @@ input[type="range"]::-moz-range-thumb {
 	display: flex;
 	justify-content: center;
 	align-items: center;
+	flex-direction: column;
 }
 
 .loader__spinner {
@@ -530,4 +559,12 @@ input[type="range"]::-moz-range-thumb {
 		transform: rotate(360deg);
 	}
 }
+
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.5s ease;
+}
+.fade-enter, .fade-leave-to /* .fade-leave-active in <2.1.8 */ {
+  opacity: 0.5;
+}
+
 </style>

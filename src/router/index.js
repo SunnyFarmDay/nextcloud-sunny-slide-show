@@ -4,10 +4,7 @@ import Vue from 'vue'
 import { APP_API_ROUTER_BASE, EX_APP_ID, EX_APP_MENU_ENTRY_NAME } from '../constants/AppAPI.js'
 import 'remixicon/fonts/remixicon.css'
 
-const ExAppView = () => import('../views/ExAppView.vue')
-const FilePicker = () => import('../views/FilePicker.vue')
 const SlideShow = () => import('../views/SlideShow.vue')
-
 
 Vue.use(VueRouter)
 
@@ -24,26 +21,6 @@ const router = new VueRouter({
 	base: generateUrl(`${APP_API_ROUTER_BASE}/${EX_APP_ID}/${EX_APP_MENU_ENTRY_NAME}`, ''), // setting base to AppAPI embedded URL
 	linkActiveClass: 'active',
 	routes: [
-		{
-			path: '',
-			component: ExAppView,
-			name: 'ui_example_index',
-			meta: {
-				title: async () => {
-					return t('ui_example', 'ExApp UI Example')
-				},
-			},
-		},
-		{
-			path: '/second_page',
-			component: FilePicker,
-			name: 'ui_example_file_picker',
-			meta: {
-				title: async () => {
-					return t('ui_example', 'ExApp send file')
-				},
-			},
-		},
 		{
 			path: '/slide_show',
 			component: SlideShow,

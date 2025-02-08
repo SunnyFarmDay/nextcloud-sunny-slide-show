@@ -48,9 +48,9 @@ const searchByFileId = async (fileId) => {
 						// <d:getetag />
 						// <d:getcontenttype />
 						// <d:resourcetype />
-						// <oc:fileid />
+						<oc:fileid />
 						// <oc:permissions />
-						<oc:size />
+						// <oc:size />
 						// <d:getcontentlength />
 						// <oc:favorite />
 						// <oc:comments-unread />
