@@ -19,9 +19,15 @@ from nc_py_api.ex_app import (
     SettingsField,
     SettingsFieldType,
     SettingsForm,
-    UiActionFileInfo,
-    nc_app
+    nc_app,
+    
 )
+
+from io import BytesIO
+
+
+from nc_py_api.files import ActionFileInfo, ActionFileInfoEx
+
 from contextvars import ContextVar
 
 from gettext import translation
@@ -37,6 +43,17 @@ def _(text):
 
 print(_("UI example"))
 
+class NcInstance:
+    def __init__(self):
+        self.ncDict = {}
+    
+    def setNc(self, userName, nc: NextcloudApp):
+        self.ncDict[userName] = nc
+    
+    def getNc(self, userName) -> NextcloudApp:
+        return self.ncDict[userName]
+
+ncInstance = NcInstance()
 
 class LocalizationMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -198,10 +215,12 @@ def enabled_handler(enabled: bool, nc: NextcloudApp) -> str:
         )
         nc.ui.resources.set_script("top_menu", "first_menu", "js/sunny-slide-show-main")
         nc.ui.top_menu.register("first_menu", "Sunny Slide Show", "img/app.svg")
-        nc.ui.files_dropdown_menu.register("test_menu", _("Test menu"), "api/test_menu", mime="image/jpeg",
-                                           icon="img/app-dark.svg")
-        nc.ui.files_dropdown_menu.register_ex("test_redirect", _("Test redirect"), "api/test_redirect", mime="image/jpeg",
-                                              icon="img/app-dark.svg")
+        # nc.ui.files_dropdown_menu.register("test_menu", _("Test menu"), "api/test_menu", mime="image, video",
+        #                                    icon="img/app-dark.svg")
+        # nc.ui.files_dropdown_menu.register_ex("test_redirect", _("Test redirect"), "api/test_redirect", mime="image/jpeg",
+        #                                       icon="img/app-dark.svg")
+        nc.ui.files_dropdown_menu.register_ex("redirect_slideshow", _("To Slide Show"), "api/redirect_slide_show", mime="image, video",
+                                        icon="img/app-dark.svg")
         nc.occ_commands.register("ui_example:ping", "/occ_ping")
         nc.occ_commands.register(
             "ui_example:setup",
@@ -242,8 +261,9 @@ def enabled_handler(enabled: bool, nc: NextcloudApp) -> str:
         )
         nc.ui.resources.delete_script("top_menu", "first_menu", "js/ui_example-main")
         nc.ui.top_menu.unregister("first_menu")
-        nc.ui.files_dropdown_menu.unregister("test_menu")
-        nc.ui.files_dropdown_menu.unregister("test_redirect")
+        # nc.ui.files_dropdown_menu.unregister("test_menu")
+        # nc.ui.files_dropdown_menu.unregister("test_redirect")
+        nc.ui.files_dropdown_menu.unregister("redirect_slideshow")
         nc.occ_commands.unregister("ui_example:ping")
         nc.occ_commands.unregister("ui_example:setup")
         nc.occ_commands.unregister("ui_example:stream")
@@ -264,34 +284,48 @@ async def verify_initial_value(
     )
 
 
-@APP.post("/api/test_menu")
+# @APP.post("/api/test_menu")
+# async def test_menu_handler(
+#     file: UiActionFileInfo,
+#     nc: Annotated[NextcloudApp, Depends(nc_app)],
+#     accept_language: Annotated[str | None, Header()] = None
+# ):
+#     print(f'File: {file}')
+#     print(f'Accept-Language: {accept_language}')
+#     print(_("Test menu"))
+#     # Note: Only singular string translations are supported
+#     nc.notifications.create(_('Test notification subject'), _("Test notification message"))
+#     return responses.Response()
+
+
+# @APP.post("/api/test_redirect")
+# async def test_menu_handler(
+#     files: NodesPayload,
+#     nc: Annotated[NextcloudApp, Depends(nc_app)],
+#     accept_language: Annotated[str | None, Header()] = None
+# ):
+#     print(f'Files: {files}')
+#     print(f'Accept-Language: {accept_language}')
+#     print(_("Test redirect"))
+#     nc.notifications.create(_('Test redirect notification subject'), _("Test redirect notification message"))
+#     return responses.JSONResponse(content={"redirect_handler": "first_menu/second_page"})
+
+nc_instance: NextcloudApp
+
+@APP.post("/api/redirect_slide_show")
 async def test_menu_handler(
-    file: UiActionFileInfo,
+    files: ActionFileInfoEx,
     nc: Annotated[NextcloudApp, Depends(nc_app)],
     accept_language: Annotated[str | None, Header()] = None
 ):
-    print(f'File: {file}')
-    print(f'Accept-Language: {accept_language}')
-    print(_("Test menu"))
-    # Note: Only singular string translations are supported
-    nc.notifications.create(_('Test notification subject'), _("Test notification message"))
-    return responses.Response()
+    
+    ncInstance.setNc(nc.user, nc)
 
-class NodesPayload(BaseModel):
-    files: list[UiActionFileInfo]
-
-
-@APP.post("/api/test_redirect")
-async def test_menu_handler(
-    files: NodesPayload,
-    nc: Annotated[NextcloudApp, Depends(nc_app)],
-    accept_language: Annotated[str | None, Header()] = None
-):
     print(f'Files: {files}')
     print(f'Accept-Language: {accept_language}')
-    print(_("Test redirect"))
+    print(_("Redirect to Slide Show"))
     nc.notifications.create(_('Test redirect notification subject'), _("Test redirect notification message"))
-    return responses.JSONResponse(content={"redirect_handler": "first_menu/second_page"})
+    return responses.JSONResponse(content={"redirect_handler": "first_menu/slide_show"})
 
 
 class OccPayload(BaseModel):
@@ -343,6 +377,21 @@ async def nextcloud_file(
     print(args["file_info"])
     return responses.Response()
 
+@APP.post("/api/get_image")
+async def get_image(
+    args: dict,
+):
+    # query image with 
+    nc = ncInstance.getNc(args['user_id'])
+    file = nc.files.by_id(args["file_info"]['fileid'])
+    print(file)
+    contentType = args["file_info"]['getcontenttype']
+    content = nc.files.download(file)
+    file_stream = BytesIO(content)
+    response = responses.StreamingResponse(content=file_stream, media_type=contentType, headers={"Content-Disposition": f"attachment; filename={file.name}"})
+    print(response)
+    
+    return response
 
 if __name__ == "__main__":
     run_app("main:APP", log_level="trace")

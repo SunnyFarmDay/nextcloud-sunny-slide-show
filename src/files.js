@@ -44,18 +44,18 @@ const searchByFileId = async (fileId) => {
 			<d:basicsearch>
 				<d:select>
 					<d:prop>
-						<d:getlastmodified />
-						<d:getetag />
-						<d:getcontenttype />
-						<d:resourcetype />
-						<oc:fileid />
-						<oc:permissions />
+						// <d:getlastmodified />
+						// <d:getetag />
+						// <d:getcontenttype />
+						// <d:resourcetype />
+						// <oc:fileid />
+						// <oc:permissions />
 						<oc:size />
-						<d:getcontentlength />
-						<oc:favorite />
-						<oc:comments-unread />
-						<oc:owner-display-name />
-						<oc:share-types />
+						// <d:getcontentlength />
+						// <oc:favorite />
+						// <oc:comments-unread />
+						// <oc:owner-display-name />
+						// <oc:share-types />
 					</d:prop>
 				</d:select>
 				<d:from>
@@ -84,6 +84,12 @@ const searchByFileId = async (fileId) => {
 	return response?.data?.results[0] ?? null
 }
 
+const getFileContentsByFilename = async (filename) => {
+	const davClient = davGetClient(generateRemoteUrl(`dav/files/${getCurrentUser().uid}`))
+	const response = await davClient.getFileContents(filename)
+	return response?.data
+}
+
 const formatBytes = (bytes, decimals = 2) => {
 	if (bytes === 0) return '0 B'
 	const k = 1024
@@ -97,4 +103,5 @@ export {
 	requestFileInfo,
 	searchByFileId,
 	formatBytes,
+	getFileContentsByFilename,
 }

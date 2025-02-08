@@ -2,9 +2,12 @@ import VueRouter from 'vue-router' // eslint-disable-line
 import { generateUrl } from '@nextcloud/router'
 import Vue from 'vue'
 import { APP_API_ROUTER_BASE, EX_APP_ID, EX_APP_MENU_ENTRY_NAME } from '../constants/AppAPI.js'
+import 'remixicon/fonts/remixicon.css'
 
 const ExAppView = () => import('../views/ExAppView.vue')
 const FilePicker = () => import('../views/FilePicker.vue')
+const SlideShow = () => import('../views/SlideShow.vue')
+
 
 Vue.use(VueRouter)
 
@@ -38,6 +41,16 @@ const router = new VueRouter({
 			meta: {
 				title: async () => {
 					return t('ui_example', 'ExApp send file')
+				},
+			},
+		},
+		{
+			path: '/slide_show',
+			component: SlideShow,
+			name: 'slide_show',
+			meta: {
+				title: async () => {
+					return t('sunny-slide-show', 'ExApp slide show')
 				},
 			},
 		},

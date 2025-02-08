@@ -1,8 +1,12 @@
 import axios from '@nextcloud/axios'
-import { generateUrl } from '@nextcloud/router'
+import { generateUrl, generateRemoteUrl } from '@nextcloud/router'
 import { showError, showSuccess } from '@nextcloud/dialogs'
 import { APP_API_PROXY_URL_PREFIX, EX_APP_ID } from '../constants/AppAPI.js'
 import { translate as t } from '@nextcloud/l10n'
+
+import { getCurrentUser } from '@nextcloud/auth'
+import { getClient } from '@nextcloud/files/dav'
+import { davGetClient } from '@nextcloud/files'
 
 const state = {
 	initial_state_value: {},
@@ -47,6 +51,25 @@ const actions = {
 			.catch(() => {
 				showError(t('ui_example', 'Failed to send file'))
 			})
+	},
+
+	getImageFromExApp(context, fileInfo) {
+		return axios.post(generateUrl(`${APP_API_PROXY_URL_PREFIX}/${EX_APP_ID}/api/get_image`), {
+			file_info: fileInfo,
+			user_id: getCurrentUser().uid,
+			responseType: 'blob',
+		})
+	},
+	getImageFromDav(context, path) {
+		const davClient = davGetClient(generateRemoteUrl(`dav/files/${getCurrentUser().uid}`))
+		return davClient.getFileContents(path)
+	},
+	async loadImageFromDav(context, filename) {
+		const davClient = getClient()
+		// remove the first two leading components of the path
+		const path = filename.split('/').slice(3).join('/')
+		const response = await davClient.getFileContents(`${path}`, { details: true })
+		return URL.createObjectURL(new Blob([response.data], { type: response.headers['content-type'] }))
 	},
 }
 
