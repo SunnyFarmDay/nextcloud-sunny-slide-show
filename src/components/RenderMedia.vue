@@ -2,21 +2,23 @@
 	<div class="zoom-container"
 		:style="{ transform: `scale(${scale}) translate(${translateX}px, ${translateY}px)`, touchAction: 'none' }"
 		@touchstart="onTouchStart"
-		@touchmove.prevent="onTouchMove"
+		@touchmove="onTouchMove"
 		@touchend="onTouchEnd">
 		<img
 			v-if="mediaType.startsWith('image')"
 			:src="selectedUrl"
 			alt="Selected image"
-			class="animate"
-			:style="animationEnabled ? animation : {}">
+			:class="animationEnabled && restartAnmimation ? 'animate' : ''"
+			:style="animationEnabled ? animation : {}"
+			@touchstart.prevent
+			@touchmove.prevent>
 		<video
 			v-else-if="mediaType.startsWith('video')"
 			:src="selectedUrl"
 			controls
 			autoplay
 			v-bind="videoAttributes"
-			@ended="handleVideoEnd" />
+			@ended="handleVideoEnded" />
 	</div>
 </template>
 
@@ -43,29 +45,59 @@ export default {
 			type: Boolean,
 			default: false,
 		},
+		videoEndedHandler: {
+			type: Function,
+			default: () => {},
+		},
 	},
 	data() {
 		return {
 			scale: 1,
 			initialDistance: 0,
 			isZooming: false,
+			isScrolling: false,
 			startX: 0,
 			startY: 0,
 			translateX: 0,
 			translateY: 0,
+			restartAnmimation: false,
+			scrollX: 0,
 		}
+	},
+	watch: {
+		selectedUrl() {
+			// Reset zoom and translation when the image changes
+			this.scale = 1
+			this.translateX = 0
+			this.translateY = 0
+			this.restartAnmimation = false
+			this.$nextTick(() => {
+				setTimeout(() => {
+					this.restartAnmimation = true
+				}, 100)
+			})
+		},
 	},
 	methods: {
 		onTouchStart(event) {
-			if (event.touches.length === 2) {
+			if (event.touches.length === 2 && this.mediaType.startsWith('image')) {
+				this.isScrolling = false
 				this.isZooming = true
 				this.initialDistance = this.getDistance(event.touches)
 				this.startX = event.touches[0].clientX
 				this.startY = event.touches[0].clientY
+			} else if (event.touches.length === 1 && this.mediaType.startsWith('image')) {
+				// allow default touch behavior
+				this.isZooming = false
+				this.isScrolling = true
+				this.scrollX = event.touches[0].clientX
+
 			}
 		},
 		onTouchMove(event) {
 			if (this.isZooming && event.touches.length === 2) {
+				// do event prevent default to avoid scrolling
+				event.preventDefault()
 				const currentDistance = this.getDistance(event.touches)
 				const scaleChange = currentDistance / this.initialDistance
 				this.scale = Math.max(1, Math.min(this.scale * scaleChange, 3)) // Limit scale between 1 and 3
@@ -80,10 +112,28 @@ export default {
 				// Update start positions
 				this.startX = event.touches[0].clientX
 				this.startY = event.touches[0].clientY
+			} else {
+				if (this.isScrolling) {
+					event.preventDefault()
+					const dx = event.touches[0].clientX - this.scrollX
+					this.translateX += dx
+					this.scrollX = event.touches[0].clientX
+				}
 			}
 		},
 		onTouchEnd(event) {
 			if (event.touches.length < 2) {
+				if (this.isScrolling) {
+					this.isScrolling = false
+					// handle if scroll to the left or right if needed using percentage of the screen width)
+					if (this.translateX > 50) {
+						this.translateX = 0
+						this.$emit('right-swipe')
+					} else if (this.translateX < -50) {
+						this.translateX = 0
+						this.$emit('left-swipe')
+					}
+				}
 				this.isZooming = false
 				// Reset translation when touch ends
 				this.translateX = 0
@@ -95,9 +145,8 @@ export default {
 			const dy = touches[0].clientY - touches[1].clientY
 			return Math.sqrt(dx * dx + dy * dy)
 		},
-		handleVideoEnd() {
-			// Custom logic for when the video ends
-			this.$emit('video-ended')
+		handleVideoEnded() {
+			this.videoEndedHandler()
 		},
 	},
 }

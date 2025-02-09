@@ -1,0 +1,3 @@
+[submodule "lib/nc_py_api"]
+	path = lib/nc_py_api
+	url = git@github.com:cloud-py-api/nc_py_api.git

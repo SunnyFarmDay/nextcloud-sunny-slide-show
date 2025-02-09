@@ -23,9 +23,6 @@ from nc_py_api.ex_app import (
     
 )
 
-from io import BytesIO
-
-
 from nc_py_api.files import ActionFileInfo, ActionFileInfoEx
 
 from contextvars import ContextVar
@@ -40,21 +37,6 @@ current_translator.set(translation(os.getenv("APP_ID"), LOCALE_DIR, languages=["
 def _(text):
     return current_translator.get().gettext(text)
 
-
-print(_("UI example"))
-
-class NcInstance:
-    def __init__(self):
-        self.ncDict = {}
-    
-    def setNc(self, userName, nc: NextcloudApp):
-        self.ncDict[userName] = nc
-    
-    def getNc(self, userName) -> NextcloudApp:
-        return self.ncDict[userName]
-
-ncInstance = NcInstance()
-
 class LocalizationMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         request_lang = request.headers.get('Accept-Language', 'en')
@@ -67,13 +49,11 @@ class LocalizationMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         return response
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     set_handlers(app, enabled_handler)
     print(_("UI example"))
     yield
-
 
 APP = FastAPI(lifespan=lifespan)
 APP.add_middleware(AppAPIAuthMiddleware)
@@ -208,49 +188,16 @@ def enabled_handler(enabled: bool, nc: NextcloudApp) -> str:
     print(f"enabled={enabled}")
     if enabled:
 
+        nc.ui.resources.set_script("top_menu", "first_menu", "js/sunny-slide-show-main")
         nc.ui.files_dropdown_menu.register_ex("redirect_slideshow", _("To Slide Show"), "api/redirect_slide_show", mime="image, video",
                                         icon="img/app-dark.svg")
-        nc.occ_commands.register("ui_example:ping", "/occ_ping")
-        nc.occ_commands.register(
-            "ui_example:setup",
-            "/occ_setup",
-            arguments=[
-                {
-                    "name": "test_arg",
-                    "mode": "required",
-                    "description": "Test argument",
-                }
-            ],
-        )
-        nc.occ_commands.register(
-            "ui_example:stream",
-            "/occ_stream",
-            arguments=[
-                {
-                    "name": "stream_count",
-                    "mode": "required",
-                    "description": "Number of stream rows",
-                }
-            ],
-            options=[
-                {
-                    "name": "double",
-                    "mode": "optional",
-                    "description": "Double the stream rows",
-                    "default": False,
-                }
-            ],
-        )
 
         if nc.srv_version["major"] >= 29:
             nc.ui.settings.register_form(SETTINGS_EXAMPLE)
     else:
+        nc.ui.resources.delete_script("top_menu", "first_menu", "js/ui_example-main")
         nc.ui.files_dropdown_menu.unregister("redirect_slideshow")
-        nc.occ_commands.unregister("ui_example:ping")
-        nc.occ_commands.unregister("ui_example:setup")
-        nc.occ_commands.unregister("ui_example:stream")
     return ""
-
 
 class Button1Format(BaseModel):
     initial_value: str
@@ -263,57 +210,8 @@ async def test_menu_handler(
     nc: Annotated[NextcloudApp, Depends(nc_app)],
     accept_language: Annotated[str | None, Header()] = None
 ):
-    
-    ncInstance.setNc(nc.user, nc)
-
-    print(f'Files: {files}')
     print(f'Accept-Language: {accept_language}')
-    print(_("Redirect to Slide Show"))
-    nc.notifications.create(_('Test redirect notification subject'), _("Test redirect notification message"))
     return responses.JSONResponse(content={"redirect_handler": "first_menu/slide_show"})
-
-
-class OccPayload(BaseModel):
-    arguments: dict | None = None
-    options: dict | None = None
-
-
-class OccData(BaseModel):
-    occ: OccPayload
-
-
-@APP.post("/occ_ping")
-async def occ_ping():
-    return responses.Response(content="<info>PONG</info>\n")
-
-
-@APP.post("/occ_setup")
-async def occ_setup(data: OccData):
-    print(f"params: {data}")
-    test_arg = data.occ.arguments['test_arg']
-    print(f"test_arg: {test_arg}")
-    if test_arg == "test":
-        return responses.Response(content="<info>OK</info>\n")
-    else:
-        return responses.Response(content="<error>ERROR</error>\n")
-
-
-def fake_data_streamer(data: OccData):
-    stream_count = int(data.occ.arguments['stream_count'])
-    if not stream_count:
-        stream_count = 1
-    if 'double' in data.occ.options:
-        stream_count *= 2
-    for i in range(stream_count):
-        yield f"<info>Test stream row {i}</info>\n"
-        time.sleep(0.5)
-
-
-@APP.post("/occ_stream")
-async def occ_stream(data: OccData):
-    print(f"params: {data}")
-    return StreamingResponse(fake_data_streamer(data), status_code=200, media_type="text/plain")
-
 
 if __name__ == "__main__":
     run_app("main:APP", log_level="trace")

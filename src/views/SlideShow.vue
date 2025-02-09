@@ -1,75 +1,68 @@
 <template>
 	<NcContent app-name="sunny-slide-show">
-	  <template v-if="loading">
-		<div class="loader">
-		  <div class="loader__spinner" />
-		</div>
-	  </template>
-	  <NcAppContent>
-		<div class="test-files-pickers">
-		  <div class="slider-container">
-			<h2>{{ t('ui_example', 'Slide Show') }}</h2>
-			<div class="autoplay-control">
-			  <div class="slider-container">
-				<label for="autoplay-slider">Autoplay Speed: {{ autoPlayInterval }} ms</label>
-				<input id="autoplay-slider"
-				  v-model="autoPlayInterval"
-				  type="range"
-				  min="1000"
-				  max="10000"
-				  step="100">
-			  </div>
-			</div>
-		  </div>
-  
-		  <div ref="fullscreenDiv" :class="isFullscreen ? 'media-container-fullscreen' : 'media-container'">
-			<template v-if="loadingMedia">
-			  <div class="loader_local">
+		<template v-if="loading">
+			<div class="loader">
 				<div class="loader__spinner" />
-				<p>{{ loadingMediaText }}</p>
-			  </div>
-			</template>
-			<template v-else>
-			  <transition name="fade" mode="out-in">
-				<RenderMedia
-				  :key="selectedUrl"
-				  :animation-enabled="true"
-				  :animation="animationStyles"
-				  :media-type="selectedFileInfo.mime ?? 'empty'"
-				  :selected-url="selectedUrl"
-				  @video-ended="handleVideoEnd" />
-			  </transition>
-			</template>
-			<div class="scroll-buttons">
-			  <button class="left-button" @click="handlePrevious">
-				<i class="ri-arrow-left-double-line" />
-			  </button>
-			  <button class="right-button" @click="handleNext">
-				<i class="ri-arrow-right-double-line" />
-			  </button>
 			</div>
-			<NcButton class="toggle-fullscreen" @click="toggleFullscreen">
-			  <i :class="isFullscreen ? 'ri-fullscreen-fill' : 'ri-fullscreen-fill'" />
-			</NcButton>
-			<NcButton class="toggle-auto-play" @click="toggleAutoPlay">
-			  <i :class="autoPlay ? 'ri-stop-fill' : 'ri-play-fill'" />
-			</NcButton>
-		  </div>
-		  <p>{{ testResponse }}</p>
-  
-		  <template v-if="selectedFileIds.length > 0">
-			<h3>{{ t('ui_example', 'Selected from File Actions Menu:') }}</h3>
-			<p><b>{{ t('ui_example', 'File List:') }}</b> {{ fileList }}</p>
-		  </template>
-		</div>
-	  </NcAppContent>
+		</template>
+		<NcAppContent>
+			<div class="test-files-pickers">
+				<div class="slider-container">
+					<div class="autoplay-control">
+						<div class="slider-container">
+							<label for="autoplay-slider">Autoplay Speed: {{ autoPlayInterval }} ms</label>
+							<input id="autoplay-slider"
+								v-model="autoPlayInterval"
+								type="range"
+								min="1000"
+								max="10000"
+								step="100">
+						</div>
+					</div>
+				</div>
+
+				<div ref="fullscreenDiv" :class="isFullscreen ? 'media-container-fullscreen' : 'media-container'">
+					<template v-if="loadingMedia">
+						<div class="loader_local">
+							<div class="loader__spinner" />
+							<p>{{ loadingMediaText }}</p>
+						</div>
+					</template>
+					<template v-else>
+						<transition name="fade" mode="out-in">
+							<RenderMedia
+								:animation-enabled="enableAnimation"
+								:animation="animationStyles"
+								:media-type="currentMedia.mime ?? ''"
+								:selected-url="currentUrl"
+								:video-ended-handler="handleVideoEnd"
+								@left-swipe="handleNext"
+								@right-swipe="handlePrevious" />
+						</transition>
+					</template>
+					<div class="scroll-buttons">
+						<button class="left-button" @click="handlePrevious">
+							<i class="ri-arrow-left-double-line" />
+						</button>
+						<button class="right-button" @click="handleNext">
+							<i class="ri-arrow-right-double-line" />
+						</button>
+					</div>
+					<NcButton class="toggle-fullscreen" @click="toggleFullscreen">
+						<i :class="isFullscreen ? 'ri-fullscreen-fill' : 'ri-fullscreen-fill'" />
+					</NcButton>
+					<NcButton class="toggle-auto-play" @click="toggleAutoPlay">
+						<i :class="autoPlay ? 'ri-stop-fill' : 'ri-play-fill'" />
+					</NcButton>
+				</div>
+			</div>
+		</NcAppContent>
 	</NcContent>
-  </template>
+</template>
 
 <script>
 import NcButton from '@nextcloud/vue/dist/Components/NcButton.js'
-import { getFilePickerBuilder } from '@nextcloud/dialogs'
-import { formatBytes, searchByFileId } from '../files.js'
+import { searchByFileId } from '../files.js'
 
 import '@nextcloud/dialogs/style.css'
 import NcContent from '@nextcloud/vue/dist/Components/NcContent.js'
@@ -87,16 +80,14 @@ export default {
 	data() {
 		return {
 			loading: true,
-			selectedFile: '',
-			selectedFileInfo: [],
+			currentMedia: {},
 			selectedFileIds: [],
-			selectedFilesInfo: {},
-			selectedUrl: '',
-			fileList: '',
-			testResponse: '',
+			fileInfos: {},
+			currentUrl: '',
 			currentMediaIndex: 0,
 			loadedMedia: {},
-			preloadAmount: 10,
+			preloadAmountForward: 10,
+			preloadAmountBackward: 5,
 			lastPollLoading: null,
 			isFullscreen: false,
 			autoPlay: false,
@@ -113,18 +104,23 @@ export default {
 				'--end-scale': 1,
 				'--animation-duration': '0',
 			},
+			isMobile: false,
+			enableAnimation: false,
 		}
 	},
 	computed: {
-		formattedSize() {
-			return formatBytes(this.selectedFileInfo?.size || 0) || ''
-		},
-		isImage() {
-			return this.selectedFileInfo?.mime?.startsWith('image')
-		},
-		isVideo() {
-			return this.selectedFileInfo?.mime?.startsWith('video')
-		},
+	},
+	beforeMount() {
+		// Load files info from fileIds query parameter if exists
+		if (this.$route.query.fileIds) {
+			this.selectedFileIds = this.$route.query.fileIds.split(',').map(Number)
+			this.selectedFileIds.forEach(fileId => {
+				this.fileInfos[fileId] = null
+			})
+		}
+
+		// check viewport to determine if it's a mobile device
+		this.isMobile = window.innerWidth <= 768
 	},
 	mounted() {
 		document.addEventListener('fullscreenchange', this.handleFullscreenChange)
@@ -140,41 +136,42 @@ export default {
 		document.removeEventListener('mozfullscreenchange', this.handleFullscreenChange)
 		document.removeEventListener('MSFullscreenChange', this.handleFullscreenChange)
 	},
-	beforeMount() {
-		// Load files info from fileIds query parameter if exists
-		if (this.$route.query.fileIds) {
-			this.selectedFileIds = this.$route.query.fileIds.split(',').map(Number)
-			this.selectedFilesInfo = this.selectedFileIds
-		}
-	},
 	methods: {
 		async getFileInfoIntoList(fileId) {
-			const index = this.selectedFileIds.indexOf(fileId)
-			if (index === -1) {
-				console.error('File ID not found in list:', fileId)
-				return
-			}
 			const fileInfo = await searchByFileId(fileId)
-			this.selectedFilesInfo[index] = fileInfo
+			this.fileInfos[fileId] = fileInfo
 			return fileInfo
 		},
 		randomizeAnimationStyles() {
-			this.animationStyles = {
-				'--start-x': `${Math.random() * 300}px`,
-				'--start-y': `${Math.random() * 300}px`,
-				'--end-x': `${Math.random() * 300}px`,
-				'--end-y': `${Math.random() * 300}px`,
-				'--start-scale': Math.random() * 0.25 + 1,
-				'--end-scale': Math.random() * 0.25 + 1,
-				'--animation-duration': this.autoPlayInterval / 1000 + 's',
+			if (!this.isMobile) {
+				this.animationStyles = {
+					'--start-x': '0px',
+					'--start-y': '0px',
+					'--end-x': `${Math.random() * 300}px - 150px`,
+					'--end-y': `${Math.random() * 300}px - 150px`,
+					'--start-scale': '1',
+					'--end-scale': Math.random() * 0.5 + 0.90,
+					'--animation-duration': this.autoPlayInterval / 1000 + 's',
+				}
+			} else {
+				this.animationStyles = {
+					'--start-x': '0px',
+					'--start-y': '0px',
+					'--end-x': `${Math.random() * 100}px - 50px`,
+					'--end-y': `${Math.random() * 100}px - 50px`,
+					'--start-scale': '1',
+					'--end-scale': Math.random() * 0.2 + 0.98,
+					'--animation-duration': this.autoPlayInterval / 1000 + 's',
+				}
 			}
-			console.log('Randomized animation styles:', this.animationStyles)
 		},
 		toggleAutoPlay() {
 			this.autoPlay = !this.autoPlay
 			if (this.autoPlay) {
+				this.enableAnimation = true
 				this.setViewMediaIndex(this.currentMediaIndex)
 			} else {
+				this.enableAnimation = false
 				clearTimeout(this.autoPlayTimeout)
 				this.animationStyles = {
 					'--start-x': '0',
@@ -188,9 +185,8 @@ export default {
 			}
 		},
 		handleVideoEnd() {
-			console.log('Video ended')
 			if (this.autoPlay) {
-				this.setViewMediaIndex(Math.min(this.selectedFilesInfo.length - 1, this.currentMediaIndex + 1))
+				this.setViewMediaIndex(Math.min(this.selectedFileIds.length - 1, this.currentMediaIndex + 1))
 			}
 		},
 		handleFullscreenChange() {
@@ -226,10 +222,17 @@ export default {
 			if (!this.loadedMedia[index]) {
 				this.loadedMedia[index] = true
 
-				this.getFileInfoIntoList(this.selectedFileIds[index]).then(() => {
-					this.$store.dispatch('loadImageFromDav', this.selectedFilesInfo[index].filename).then(url => {
-						this.loadedMedia[index] = url
-						this.setUpAutoPlay()
+				const fileId = this.selectedFileIds[index]
+
+				this.getFileInfoIntoList(fileId).then(() => {
+					this.$store.dispatch('loadImageFromDav', this.fileInfos[fileId].filename).then(url => {
+						if (this.loadedMedia[index] === 'abort') {
+							URL.revokeObjectURL(url)
+							this.loadedMedia[index] = null
+
+						} else {
+							this.loadedMedia[index] = url
+						}
 
 					}).catch(error => {
 						console.error('Error fetching media:', error)
@@ -239,7 +242,8 @@ export default {
 		},
 		setUpAutoPlay() {
 			if (this.autoPlay) {
-				const isVideo = this.selectedFilesInfo[this.currentMediaIndex].mime.startsWith('video')
+				const fileId = this.selectedFileIds[this.currentMediaIndex]
+				const isVideo = this.fileInfos[fileId].mime.startsWith('video')
 				if (this.autoPlayTimeout || isVideo) {
 					clearTimeout(this.autoPlayTimeout)
 				}
@@ -247,42 +251,61 @@ export default {
 					return
 				}
 				this.autoPlayTimeout = setTimeout(() => {
-					this.setViewMediaIndex(Math.min(this.selectedFilesInfo.length - 1, this.currentMediaIndex + 1))
+					this.setViewMediaIndex(Math.min(this.selectedFileIds.length - 1, this.currentMediaIndex + 1))
 				}, this.autoPlayInterval)
 			}
 		},
+		loadedMediaToCurrentDisplay() {
+			this.loadingMedia = true
+			this.loadingMediaText = ''
+			this.currentUrl = this.loadedMedia[this.currentMediaIndex]
+			this.randomizeAnimationStyles()
+			this.setUpAutoPlay()
+			this.loadingMedia = false
+		},
 		setViewMediaIndex(index) {
+			if (index < 0 || index >= this.selectedFileIds.length) {
+				return
+			}
+			this.loadingMedia = true
+			this.currentUrl = ''
 			this.currentMediaIndex = index
-			this.selectedFile = this.selectedFileIds[index]
+			this.currentMedia = {
+				fileId: this.selectedFileIds[index],
+			}
+			const fileId = this.selectedFileIds[index]
 
 			// load the current media
 			if (!this.loadedMedia[index]) {
-				this.loadingMedia = true
-				this.selectedFileInfo = null
-				this.selectedUrl = ''
-				this.getFileInfoIntoList(this.selectedFile).then(() => {
-					this.$store.dispatch('loadImageFromDav', this.selectedFilesInfo[index].filename).then(url => {
-						this.loadingMedia = false
+				if (this.fileInfos[fileId] instanceof Object) {
+					this.loadingMediaText = `Loading ${this.fileInfos[fileId].filename}...`
+					Object.assign(this.currentMedia, this.fileInfos[fileId])
+					this.$store.dispatch('loadImageFromDav', this.fileInfos[fileId].filename).then(url => {
 						this.loadedMedia[index] = url
-						this.selectedUrl = url
-						this.selectedFileInfo = this.selectedFilesInfo[index]
-						console.log('Media loaded:', this.selectedUrl)
-						this.setUpAutoPlay()
+						this.loadedMediaToCurrentDisplay()
 					}).catch(error => {
 						console.error('Error fetching media:', error)
 					})
-				})
+				} else {
+					this.loadingMediaText = 'Loading media...'
+					this.getFileInfoIntoList(fileId).then(() => {
+						Object.assign(this.currentMedia, this.fileInfos[fileId])
+						this.$store.dispatch('loadImageFromDav', this.fileInfos[fileId].filename).then(url => {
+							this.loadedMedia[index] = url
+							this.loadedMediaToCurrentDisplay()
+						}).catch(error => {
+							console.error('Error fetching media:', error)
+						})
+					})
+				}
 			} else {
 				if (this.loadedMedia[index] === true) {
-					this.loadingMedia = true
-					this.selectedFileInfo = null
-					this.selectedUrl = ''
-					if (this.selectedFilesInfo[index] instanceof Object) {
-						this.loadingMediaText = `Loading ${this.selectedFilesInfo[index].filename}...`
+					Object.assign(this.currentMedia, this.fileInfos[fileId])
+					if (this.currentMedia.filename) {
+						this.loadingMediaText = `Loading ${this.currentMedia.filename}...`
 					} else {
 						this.loadingMediaText = 'Loading media...'
 					}
-					console.log('Media not loaded yet, retrying in 100ms')
 					if (this.lastPollLoading) {
 						clearTimeout(this.lastPollLoading)
 					}
@@ -290,19 +313,22 @@ export default {
 						this.setViewMediaIndex(index)
 					}, 100)
 				} else {
-					this.loadingMedia = false
-					this.loadingMediaText = ''
-					this.selectedUrl = this.loadedMedia[index]
-					this.selectedFileInfo = this.selectedFilesInfo[index]
-					console.log('Media loaded:', this.selectedUrl)
-					this.randomizeAnimationStyles()
-					this.setUpAutoPlay()
+					Object.assign(this.currentMedia, this.fileInfos[fileId])
+					this.loadedMediaToCurrentDisplay()
 				}
 			}
 
-			// preload x files before and after the current one
-			for (let i = Math.max(0, index - this.preloadAmount); i <= Math.min(this.selectedFilesInfo.length - 1, index + this.preloadAmount); i++) {
-				if (i !== index) {
+			// preload x files before and after the current one and revoke/abort the rest
+			for (let i = Math.max(0, index - this.preloadAmountBackward - 2); i <= Math.min(this.selectedFileIds.length - 1, index + this.preloadAmountForward + 2); i++) {
+				if (i < index - this.preloadAmountBackward || i > index + this.preloadAmountForward) {
+					if (this.loadedMedia[i] === true) {
+						this.loadedMedia[i] = 'abort'
+					}
+					if (this.loadedMedia[i] && this.loadedMedia[i].startsWith('blob:')) {
+						URL.revokeObjectURL(this.loadedMedia[i])
+						this.loadedMedia[i] = null
+					}
+				} else if (i !== index) {
 					this.preloadMedia(i)
 				}
 			}
@@ -312,17 +338,7 @@ export default {
 			this.setViewMediaIndex(Math.max(0, this.currentMediaIndex - 1))
 		},
 		handleNext() {
-			this.setViewMediaIndex(Math.min(this.selectedFilesInfo.length - 1, this.currentMediaIndex + 1))
-		},
-		getFilesPicker(title) {
-			return getFilePickerBuilder(title)
-				.setMultiSelect(false)
-				.setType(1)
-				.allowDirectories(true)
-				.build()
-		},
-		sendToExApp() {
-			this.$store.dispatch('sendNextcloudFileToExApp', this.selectedFileInfo)
+			this.setViewMediaIndex(Math.min(this.selectedFileIds.length - 1, this.currentMediaIndex + 1))
 		},
 	},
 }
@@ -367,7 +383,7 @@ export default {
 	position: relative;
 	/* Change to relative for normal layout */
 	width: 100%;
-	height: 80vh;
+	height: 60vh;
 	display: flex;
 	justify-content: center;
 	align-items: center;
@@ -563,6 +579,7 @@ input[type="range"]::-moz-range-thumb {
 .fade-enter-active, .fade-leave-active {
   transition: opacity 0.3s ease;
 }
+
 .fade-enter, .fade-leave-to /* .fade-leave-active in <2.1.8 */ {
   opacity: 0;
 }
